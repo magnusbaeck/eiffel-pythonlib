@@ -17,26 +17,69 @@
 
 https://github.com/eiffel-community/eiffel/blob/master/eiffel-vocabulary/EiffelArtifactCreatedEvent.md
 """
-from eiffellib.events.eiffel_base_event import (EiffelBaseEvent, EiffelBaseLink,
-                                                EiffelBaseData, EiffelBaseMeta)
+import time
+import uuid
+from enum import Enum
+from typing import List
+from typing import Optional
+
+import pydantic
 
 
-class EiffelArtifactCreatedLink(EiffelBaseLink):
-    """Link object for eiffel artifact created event."""
+class EiffelMetaSource(pydantic.BaseModel):
+    domainId: Optional[str]
+    host: Optional[str]
+    name: Optional[str]
+    serializer: Optional[str]
+    uri: Optional[str]
 
 
-class EiffelArtifactCreatedData(EiffelBaseData):
-    """Data object for eiffel artifact created event."""
+class EiffelMeta(pydantic.BaseModel):
+    id: uuid.UUID
+    type: str
+    version: str
+    time: int
+    tags: Optional[List[str]]
+    source: Optional[EiffelMetaSource]
 
 
-class EiffelArtifactCreatedEvent(EiffelBaseEvent):
-    """Eiffel artifact created event."""
+class EiffelArtifactCreatedFileInfo(pydantic.BaseModel):
+    name: str
+    tags: Optional[List[str]]
 
-    version = "3.0.0"
 
-    def __init__(self, version=None):
-        """Initialize data, meta and links."""
-        super(EiffelArtifactCreatedEvent, self).__init__(version)
-        self.meta = EiffelBaseMeta("EiffelArtifactCreatedEvent", self.version)
-        self.links = EiffelArtifactCreatedLink()
-        self.data = EiffelArtifactCreatedData()
+class EiffelArtifactRequiresImpl(str, Enum):
+    NONE = "NONE"
+    ANY = "ANY"
+    EXACTLY_ONE = "EXACTLY_ONE"
+    AT_LEAST_ONE = "AT_LEAST_ONE"
+
+
+class EiffelArtifactCreatedData(pydantic.BaseModel):
+    identity: str
+    fileInformation: Optional[List[EiffelArtifactCreatedFileInfo]]
+    buildCommand: Optional[str]
+    requiresImplementation: Optional[EiffelArtifactRequiresImpl]
+    implements: Optional[List[str]]
+    dependsOn: Optional[List[str]]
+    name: Optional[str]
+
+
+class EiffelLink(pydantic.BaseModel):
+    type: str
+    target: uuid.UUID
+
+
+class EiffelArtifactCreatedEvent(pydantic.BaseModel):
+    meta: EiffelMeta = None
+    data: EiffelArtifactCreatedData
+    links: List[EiffelLink] = []
+
+    @pydantic.validator("meta", pre=True, always=True)
+    def default_meta(cls, v):
+        return v or EiffelMeta(
+            id=uuid.uuid4(),
+            type="EiffelArtifactCreatedEvent",
+            version="3.0.0",
+            time=time.time() * 1000,
+        )
